@@ -4,7 +4,7 @@
 [Plone](https://plone.org) and the [Zope application server](https://www.zope.org).
 
 This repository is based [plone.docker](https://github.com/plone/plone.docker) –
-Thanks to the great work of @avoinea and the other contributors.
+Thanks to the great work of http://github.com/avoinea and the other contributors.
 
 ### Try SENAITE
 
@@ -28,10 +28,13 @@ Choose either single SENAITE instance or ZEO cluster.
 
 Standalone instances are best suited for testing SENAITE and development.
 
-Download and start the latest SENAITE container, based on [Debian](https://www.debian.org/).
+Build and start the latest SENAITE container, based on [Debian](https://www.debian.org/).
 
-```console
-$ docker run -p 8080:8080 senaite
+```bash
+$ git clone https://github.com/senaite/senaite.docker
+$ cd senaite.docker/1.3.3
+$ docker build -t senaite .
+$ docker run --rm --name senaite -p 8080:8080 senaite
 ```
 
 This image exposes the TCP Port `8080` via `EXPOSE 8080`, so standard container
@@ -47,13 +50,13 @@ ZEO cluster are best suited for production setups, you will **need** a loadbalan
 
 Start ZEO server in the background
 
-```console
+```bash
 $ docker run -d --name=zeo senaite zeo
 ```
 
 Start 2 SENAITE clients (also in the background)
 
-```console
+```bash
 $ docker run -d --name=instance1 --link=zeo -e ZEO_ADDRESS=zeo:8080 -p 8081:8080 senaite
 $ docker run -d --name=instance2 --link=zeo -e ZEO_ADDRESS=zeo:8080 -p 8082:8080 senaite
 ```
@@ -62,13 +65,13 @@ $ docker run -d --name=instance2 --link=zeo -e ZEO_ADDRESS=zeo:8080 -p 8082:8080
 
 You can also start SENAITE in debug mode (`fg`) by running
 
-```console
+```bash
 $ docker run -p 8080:8080 senaite fg
 ```
 
 Debug mode may also be used with ZEO
 
-```console
+```bash
 $ docker run --link=zeo -e ZEO_ADDRESS=zeo:8080 -p 8080:8080 senaite fg
 ```
 
@@ -88,14 +91,14 @@ The SENAITE image uses several environment variable that allow to specify a more
 
 Run SENAITE with ZEO and install the addon [senaite.storage](https://github.com/senaite/senaite.storage)
 
-```console
+```bash
 $ docker run --name=instance1 --link=zeo -e ZEO_ADDRESS=zeo:8080 -p 8080:8080 \
 -e ADDONS="senaite.storage" senaite
 ```
 
 To use specific add-ons versions:
 
-```console
+```bash
  -e ADDONS="senaite.storage==1.0.0"
 ```
 
@@ -109,3 +112,83 @@ To use specific add-ons versions:
 * `ZEO_STORAGE` - Set the storage number of the ZEO storage. Defaults to `1`.
 * `ZEO_CLIENT_CACHE_SIZE` - Set the size of the ZEO client cache. Defaults to `128MB`.
 * `ZEO_PACK_KEEP_OLD` - Can be set to false to disable the creation of *.fs.old files before the pack is run. Defaults to true.
+
+
+## Development
+
+The following sections describe how to create and publish a new senaite docker
+image on docker hub.
+
+### Create a new version of a docker image
+
+Copy an existing version structure:
+
+```console
+$ cp -r 1.3.2 1.3.3
+$ cd 1.3.3
+$ docker build --tag=senaite:v1.3.3 .
+
+[...]
+Successfully built 7af3395db8f6
+Successfully tagged senaite:v1.3.3
+```
+
+Note that the the image will automatically tagged as `v1.3.3`.
+
+             
+### Run the container
+
+Start a container based on your new image:
+
+```
+docker container run --publish 9999:8080 --detach --name s133 senaite:v1.3.3
+```
+
+We used a couple of common flags here:
+
+  - `--publish` asks Docker to forward traffic incoming on the host’s port
+                9999, to the container’s port 8080 (containers have their own
+                private set of ports, so if we want to reach one from the
+                network, we have to forward traffic to it in this way;
+                otherwise, firewall rules will prevent all network traffic from
+                reaching your container, as a default security posture).
+
+  - `--detach` asks Docker to run this container in the background.
+
+  - `--name` lets us specify a name with which we can refer to our container in
+             subset
+```
+
+$ docker container ls
+CONTAINER ID        IMAGE               COMMAND                  CREATED             STATUS                             PORTS                    NAMES
+ecf514d717ba        senaite:v1.3.3      "/docker-entrypoint.…"   26 seconds ago      Up 24 seconds (health: starting)   0.0.0.0:9999->8080/tcp   s133
+```
+
+Go to http://localhost:9999 to install senaite.
+
+Stop the container with `docker container stop s133`.
+
+
+### Publish the container on Docker Hub
+
+Images must be namespaced correctly to share on Docker Hub. Specifically, images
+must be named like `<Docker Hub ID>/<Repository Name>:<tag>.` We can relabel our
+`senaite:1.3.3` image like this:
+
+```console
+$ docker image tag senaite:v1.3.3 ramonski/senaite:v1.3.3
+$ docker image tag senaite:v1.3.3 ramonski/senaite:latest
+```
+
+Finally, push the image to Docker Hub:
+
+```console
+docker image push ramonski/senaite:v1.3.3
+docker image push ramonski/senaite:latest
+```
+
+### Further information
+
+Please refer to this documentation for further information:
+
+https://docs.docker.com/get-started
